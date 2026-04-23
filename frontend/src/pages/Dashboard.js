@@ -15,7 +15,7 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const token = localStorage.getItem('token');
-  const name  = localStorage.getItem('name');
+  const name = localStorage.getItem('name');
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchItems = async () => {
@@ -92,7 +92,7 @@ function Dashboard() {
           {msg && <p className="success">{msg}</p>}
           <form onSubmit={handleSubmit}>
             <input name="itemName" placeholder="Item Name" value={form.itemName} onChange={handleChange} required />
-            <textarea name="description" placeholder="Description" value={form.description} onChange={handleChange} rows={2} style={{ width:'100%', padding:'10px', margin:'8px 0 16px', border:'1px solid #ccc', borderRadius:'4px' }} />
+            <textarea name="description" placeholder="Description" value={form.description} onChange={handleChange} rows={2} style={{ width: '100%', padding: '10px', margin: '8px 0 16px', border: '1px solid #ccc', borderRadius: '4px' }} />
             <select name="type" value={form.type} onChange={handleChange}>
               <option>Lost</option>
               <option>Found</option>
