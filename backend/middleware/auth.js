@@ -9,6 +9,9 @@ module.exports = (req, res, next) => {
     req.user = decoded.id;
     next();
   } catch (err) {
-    res.status(401).json({ msg: 'Invalid token' });
+    // ✅ Fix: log reason so you can debug expired vs malformed tokens
+    console.error('JWT verification failed:', err.message);
+    res.status(401).json({ msg: 'Invalid or expired token' });
   }
 };
+

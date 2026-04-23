@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,18 +12,38 @@ function Dashboard() {
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState('');
   const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const token = localStorage.getItem('token');
   const name = localStorage.getItem('name');
   const headers = { Authorization: `Bearer ${token}` };
 
-  const fetchItems = async () => {
-    const res = await axios.get(`${API}/api/items`);
-    setItems(res.data);
+  // ✅ Fix: auto-clear messages after 3 seconds
+  const showMsg = (text) => {
+    setMsg(text);
+    setTimeout(() => setMsg(''), 3000);
+  };
+  const showError = (text) => {
+    setError(text);
+    setTimeout(() => setError(''), 4000);
   };
 
-  useEffect(() => { fetchItems(); }, []);
+  // ✅ Fix: error handling on fetchItems
+  const fetchItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API}/api/items`);
+      setItems(res.data);
+    } catch (err) {
+      showError('Failed to load items. Is the backend running?');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -32,16 +52,16 @@ function Dashboard() {
     try {
       if (editId) {
         await axios.put(`${API}/api/items/${editId}`, form, { headers });
-        setMsg('Item updated!');
+        showMsg('✅ Item updated successfully!');
         setEditId(null);
       } else {
         await axios.post(`${API}/api/items`, form, { headers });
-        setMsg('Item added!');
+        showMsg('✅ Item reported successfully!');
       }
       setForm(emptyForm);
       fetchItems();
     } catch (err) {
-      setMsg(err.response?.data?.msg || 'Error');
+      showError(err.response?.data?.msg || '❌ Failed to save item');
     }
   };
 
@@ -57,16 +77,27 @@ function Dashboard() {
     window.scrollTo(0, 0);
   };
 
+  // ✅ Fix: error handling on handleDelete
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this item?')) return;
-    await axios.delete(`${API}/api/items/${id}`, { headers });
-    fetchItems();
+    try {
+      await axios.delete(`${API}/api/items/${id}`, { headers });
+      showMsg('🗑️ Item deleted.');
+      fetchItems();
+    } catch (err) {
+      showError(err.response?.data?.msg || '❌ Failed to delete item');
+    }
   };
 
   const handleSearch = async () => {
     if (!search.trim()) { fetchItems(); return; }
-    const res = await axios.get(`${API}/api/items/search?name=${search}`);
-    setItems(res.data);
+    try {
+      // ✅ Fix: encodeURIComponent prevents broken URLs with special chars
+      const res = await axios.get(`${API}/api/items/search?name=${encodeURIComponent(search)}`);
+      setItems(res.data);
+    } catch (err) {
+      showError('Search failed. Please try again.');
+    }
   };
 
   const logout = () => {
@@ -88,18 +119,26 @@ function Dashboard() {
 
         {/* Add / Edit Form */}
         <div className="card">
-          <h2>{editId ? 'Edit Item' : 'Report Item'}</h2>
+          <h2>{editId ? '✏️ Edit Item' : '📋 Report Item'}</h2>
           {msg && <p className="success">{msg}</p>}
+          {error && <p className="error">{error}</p>}
           <form onSubmit={handleSubmit}>
-            <input name="itemName" placeholder="Item Name" value={form.itemName} onChange={handleChange} required />
-            <textarea name="description" placeholder="Description" value={form.description} onChange={handleChange} rows={2} style={{ width: '100%', padding: '10px', margin: '8px 0 16px', border: '1px solid #ccc', borderRadius: '4px' }} />
+            <input name="itemName" placeholder="Item Name *" value={form.itemName} onChange={handleChange} required />
+            <textarea
+              name="description"
+              placeholder="Description (optional)"
+              value={form.description}
+              onChange={handleChange}
+              rows={2}
+              style={{ width: '100%', padding: '10px', margin: '8px 0 16px', border: '1px solid #ccc', borderRadius: '4px', fontFamily: 'inherit', fontSize: 14 }}
+            />
             <select name="type" value={form.type} onChange={handleChange}>
               <option>Lost</option>
               <option>Found</option>
             </select>
-            <input name="location" placeholder="Location" value={form.location} onChange={handleChange} required />
-            <input name="contactInfo" placeholder="Contact Info" value={form.contactInfo} onChange={handleChange} required />
-            <button type="submit" className="btn-primary">{editId ? 'Update' : 'Submit'}</button>
+            <input name="location" placeholder="Location *" value={form.location} onChange={handleChange} required />
+            <input name="contactInfo" placeholder="Contact Info *" value={form.contactInfo} onChange={handleChange} required />
+            <button type="submit" className="btn-primary">{editId ? 'Update Item' : 'Submit Report'}</button>
             {editId && (
               <button type="button" className="btn-secondary" style={{ marginLeft: 8 }}
                 onClick={() => { setEditId(null); setForm(emptyForm); }}>
@@ -109,16 +148,23 @@ function Dashboard() {
           </form>
         </div>
 
-        {/* Search */}
+        {/* Search + Table */}
         <div className="card">
-          <h2>All Items</h2>
+          <h2>📦 All Items</h2>
           <div className="search-row">
-            <input placeholder="Search by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              placeholder="Search by item name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            />
             <button className="btn-primary" onClick={handleSearch}>Search</button>
             <button className="btn-secondary" onClick={() => { setSearch(''); fetchItems(); }}>Reset</button>
           </div>
 
-          {items.length === 0 ? (
+          {loading ? (
+            <p>Loading items...</p>
+          ) : items.length === 0 ? (
             <p>No items found.</p>
           ) : (
             <table>
