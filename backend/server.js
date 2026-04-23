@@ -17,6 +17,14 @@ app.use('/api/items', itemRoutes);
 
 app.get('/', (req, res) => res.send('Lost & Found API Running'));
 
+app.get('/api/test-env', (req, res) => {
+  res.json({
+    hasMongo: !!process.env.MONGO_URI,
+    hasJWT: !!process.env.JWT_SECRET,
+    hasPort: !!process.env.PORT
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 mongoose.connect(process.env.MONGO_URI)
